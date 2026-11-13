@@ -1,7 +1,12 @@
 GEF & JINI - SHARED GALLERY (HTML + CSS + JavaScript + Supabase)
 
-SET UP (once)
+SET UP
 1. Supabase > SQL Editor > New query: paste supabase/setup.sql and Run. (Safe to run again.)
+   Run it again after app updates that add database columns or tables; album covers and shared MP3 music need this update.
+   For an existing background_music table, add a nullable text column named cover_path in Table Editor.
+   If album covers still report a missing column, run:
+   alter table public.albums add column if not exists cover_media_id uuid references public.media(id) on delete set null;
+   notify pgrst, 'reload schema';
 2. Open config.js and paste your Project URL and your PUBLISHABLE key
    (the same two values as NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local).
    NEVER paste the secret / service_role key here.
@@ -12,6 +17,7 @@ SET UP (once)
 
 RUN
 VS Code > Open Folder > this folder > Live Server > Go Live. Sign in as Gef or Jini.
+Browsers may block music autoplay until you press Play once.
 
 PUT IT ONLINE SO YOU BOTH CAN USE IT
 Upload this folder to a PRIVATE GitHub repository, add your partner as a collaborator,

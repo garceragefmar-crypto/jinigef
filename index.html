@@ -37,6 +37,15 @@
     <button class="chip" id="me" aria-label="Sign out"><i id="mei"></i><span id="men"></span></button>
   </header>
   <nav class="top" id="tabs"></nav>
+  <div class="music-bar hide" id="musicBar" aria-label="Shared music player">
+    <img class="music-cover" id="musicCover" alt="Shared song cover">
+    <div class="music-details">
+      <span class="music-kicker">OUR SHARED SONG</span>
+      <span class="music-name" id="musicName">Our shared song</span>
+      <span class="music-status" id="musicStatus"></span>
+      <audio id="musicPlayer" controls loop preload="none" aria-label="Shared background music player"></audio>
+    </div>
+  </div>
   <main id="main"></main>
   <div class="bnav" id="btabs"></div>
   <button class="fab" id="fab" aria-label="Upload photos or videos">+</button>

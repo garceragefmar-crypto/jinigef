@@ -2,6 +2,7 @@
 const sb=(window.supabase&&/^https:\/\//.test(SUPABASE_URL)&&SUPABASE_KEY&&!/PASTE/.test(SUPABASE_KEY))?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
 const DOMAIN='gefandjini.app';
 const uid=()=>crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return(c==='x'?r:(r&3|8)).toString(16)});
+const localDateKey=value=>{const d=new Date(value);return[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
 let ST,ALBUMROWS=[],PATHS={};
 function loadState(){let s={};try{s=JSON.parse(localStorage.getItem('gj_state')||'{}')}catch(e){}return{theme:null,...s}}
 function saveState(){try{localStorage.setItem('gj_state',JSON.stringify({theme:ST.theme}))}catch(e){}}
@@ -34,7 +35,7 @@ async function loadItems(){
   items=[];trash=[];
   list.forEach((r,i)=>{
     const it={id:r.id,t:r.title||'Untitled',d:r.taken_on||r.created_at.slice(0,10),k:r.kind==='video'?'v':'p',
-      a:(rows.find(x=>x.id===r.album_id)||{}).name||'',u:r.uploader,fav:r.favorite,src:urls&&urls[i]&&urls[i].signedUrl,path:r.path};
+      uploadedOn:localDateKey(r.created_at),a:(rows.find(x=>x.id===r.album_id)||{}).name||'',u:r.uploader,fav:r.favorite,src:urls&&urls[i]&&urls[i].signedUrl,path:r.path};
     PATHS[r.id]=r.path;
     if(r.deleted_at){it.del=Date.parse(r.deleted_at);trash.push(it)}else items.push(it)})}
 
@@ -73,6 +74,65 @@ async function createAlbumDB(name){
 async function renameAlbumDB(old,nw){
   const id=albumId(old);const {error}=await sb.from('albums').update({name:nw}).eq('id',id);
   if(error)throw new Error(dupMsg(error));ALBUMROWS.find(a=>a.id===id).name=nw}
+async function setAlbumCoverDB(name,mediaId){
+  const row=ALBUMROWS.find(a=>a.name===name);
+  if(!row)throw new Error('Album not found.');
+  const {error}=await sb.from('albums').update({cover_media_id:mediaId}).eq('id',row.id);
+  if(error)throw error;
+  row.cover_media_id=mediaId}
+async function backgroundMusicRecord(){
+  const {data,error}=await sb.from('background_music').select('path,title,cover_path').eq('id',true).maybeSingle();
+  if(error)throw error;
+  return data}
+async function loadBackgroundMusic(){
+  const track=await backgroundMusicRecord();
+  if(!track)return null;
+  const paths=[track.path,...(track.cover_path?[track.cover_path]:[])];
+  const {data,error}=await sb.storage.from('media').createSignedUrls(paths,86400);
+  if(error)throw error;
+  if(!data||!data[0]||!data[0].signedUrl)throw new Error('Could not create a playback URL for the shared song.');
+  if(track.cover_path&&(!data[1]||!data[1].signedUrl))throw new Error('Could not load the shared cover photo.');
+  return{...track,url:data[0].signedUrl,coverUrl:track.cover_path?data[1].signedUrl:''}}
+async function uploadBackgroundMusic(file){
+  const old=await backgroundMusicRecord();
+  const path='background-music/'+uid()+'-'+file.name.replace(/[^\w.-]/g,'_');
+  let last=-1;
+  await uploadFile(path,file,p=>{const step=Math.floor(p/20);if(step!==last){last=step;toast('Uploading shared MP3 '+p+'%')}});
+  const {error}=await sb.from('background_music').upsert({id:true,path,title:file.name.replace(/\.mp3$/i,''),cover_path:old&&old.cover_path||null},{onConflict:'id'});
+  if(error){
+    const {error:cleanupError}=await sb.storage.from('media').remove([path]);
+    if(cleanupError)throw new Error(error.message+' The failed upload could not be cleaned up: '+cleanupError.message);
+    throw error
+  }
+  if(old&&old.path!==path){
+    const {error:cleanupError}=await sb.storage.from('media').remove([old.path]);
+    if(cleanupError)toast('The new MP3 is saved, but the previous file could not be removed: '+cleanupError.message)
+  }
+  return{path,title:file.name.replace(/\.mp3$/i,'')}}
+async function uploadBackgroundMusicCover(file){
+  const old=await backgroundMusicRecord();
+  if(!old)throw new Error('Upload the shared MP3 before adding its cover photo.');
+  const path='background-music/covers/'+uid()+'-'+file.name.replace(/[^\w.-]/g,'_');
+  await uploadFile(path,file);
+  const {error}=await sb.from('background_music').update({cover_path:path}).eq('id',true);
+  if(error){
+    const {error:cleanupError}=await sb.storage.from('media').remove([path]);
+    if(cleanupError)throw new Error(error.message+' The failed cover upload could not be cleaned up: '+cleanupError.message);
+    throw error
+  }
+  if(old.cover_path){
+    const {error:cleanupError}=await sb.storage.from('media').remove([old.cover_path]);
+    if(cleanupError)toast('The new cover is saved, but the previous cover file could not be removed: '+cleanupError.message)
+  }
+  return path}
+async function removeBackgroundMusic(){
+  const old=await backgroundMusicRecord();
+  if(!old)return;
+  const {error}=await sb.from('background_music').delete().eq('id',true);
+  if(error)throw error;
+  const {error:storageError}=await sb.storage.from('media').remove([old.path,...(old.cover_path?[old.cover_path]:[])]);
+  if(storageError)toast('The track was removed from the app, but its stored file could not be deleted: '+storageError.message)
+}
 async function downloadItem(it){
   const {data,error}=await sb.storage.from('media').createSignedUrl(it.path||PATHS[it.id],120,{download:true});
   if(error)return toast(error.message);location.href=data.signedUrl}
