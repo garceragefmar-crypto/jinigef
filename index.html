@@ -38,13 +38,14 @@
   </header>
   <nav class="top" id="tabs"></nav>
   <div class="music-bar hide" id="musicBar" aria-label="Shared music player">
+    <button class="music-drag-handle" id="musicDragHandle" type="button" aria-label="Move music player" title="Drag to move">OUR SHARED SONG <span aria-hidden="true">⠿</span></button>
     <img class="music-cover" id="musicCover" alt="Shared song cover">
     <div class="music-details">
-      <span class="music-kicker">OUR SHARED SONG</span>
       <span class="music-name" id="musicName">Our shared song</span>
       <span class="music-status" id="musicStatus"></span>
       <audio id="musicPlayer" controls loop preload="none" aria-label="Shared background music player"></audio>
     </div>
+    <button class="music-resize-handle" id="musicResizeHandle" type="button" aria-label="Resize music player" title="Drag to resize"></button>
   </div>
   <main id="main"></main>
   <div class="bnav" id="btabs"></div>

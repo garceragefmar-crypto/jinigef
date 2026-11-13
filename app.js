@@ -39,6 +39,7 @@ async function refreshSharedMusic(autoplay){
   $('#musicName').textContent=track.title||'Our shared song';
   $('#musicStatus').textContent='';
   bar.classList.remove('hide');
+  restoreMusicBox();
   if(autoplay){
     try{await audio.play()}
     catch{$('#musicStatus').textContent='Autoplay blocked — press Play.'}
@@ -47,6 +48,63 @@ async function refreshSharedMusic(autoplay){
 }
 $('#musicPlayer').onplay=()=>{$('#musicStatus').textContent='Now playing'};
 $('#musicPlayer').onpause=()=>{$('#musicStatus').textContent='Paused'};
+
+function constrainMusicBox(left,top,width,height){
+  const box=$('#musicBar');
+  const maxWidth=Math.max(190,window.innerWidth-16),maxHeight=Math.max(240,window.innerHeight-16);
+  width=Math.min(Math.max(190,width),maxWidth);height=Math.min(Math.max(240,height),maxHeight);
+  left=Math.min(Math.max(0,left),window.innerWidth-width);
+  top=Math.min(Math.max(0,top),window.innerHeight-height);
+  box.style.left=left+'px';box.style.top=top+'px';
+  box.style.right='auto';box.style.bottom='auto';box.style.transform='none';
+  box.style.width=width+'px';box.style.height=height+'px';
+  return{left,top,width,height}
+}
+function saveMusicBox(){
+  const box=$('#musicBar'),rect=box.getBoundingClientRect();
+  const state={left:rect.left,top:rect.top,width:rect.width,height:rect.height};
+  try{localStorage.setItem('gj_music_box',JSON.stringify(state))}
+  catch(error){toast('Could not save music player position: '+error.message)}
+}
+function restoreMusicBox(){
+  let state;
+  try{state=JSON.parse(localStorage.getItem('gj_music_box')||'null')}
+  catch(error){toast('Could not read saved music player position: '+error.message);return}
+  if(!state||![state.left,state.top,state.width,state.height].every(Number.isFinite))return;
+  constrainMusicBox(state.left,state.top,state.width,state.height)
+}
+function beginMusicBoxGesture(handle,resize){
+  handle.addEventListener('pointerdown',event=>{
+    if(event.button!==0&&event.pointerType==='mouse')return;
+    event.preventDefault();
+    const box=$('#musicBar'),rect=box.getBoundingClientRect();
+    const start={x:event.clientX,y:event.clientY,left:rect.left,top:rect.top,width:rect.width,height:rect.height};
+    handle.setPointerCapture(event.pointerId);
+    const move=moveEvent=>{
+      const dx=moveEvent.clientX-start.x,dy=moveEvent.clientY-start.y;
+      if(resize)constrainMusicBox(start.left,start.top,start.width+dx,start.height+dy);
+      else constrainMusicBox(start.left+dx,start.top+dy,start.width,start.height)
+    };
+    const finish=()=>{
+      handle.removeEventListener('pointermove',move);
+      handle.removeEventListener('pointerup',finish);
+      handle.removeEventListener('pointercancel',finish);
+      if(handle.hasPointerCapture(event.pointerId))handle.releasePointerCapture(event.pointerId);
+      saveMusicBox()
+    };
+    handle.addEventListener('pointermove',move);
+    handle.addEventListener('pointerup',finish);
+    handle.addEventListener('pointercancel',finish)
+  })
+}
+beginMusicBoxGesture($('#musicDragHandle'),false);
+beginMusicBoxGesture($('#musicResizeHandle'),true);
+window.addEventListener('resize',()=>{
+  const box=$('#musicBar');
+  if(box.classList.contains('hide')||!box.style.left)return;
+  const rect=box.getBoundingClientRect();
+  constrainMusicBox(rect.left,rect.top,rect.width,rect.height);saveMusicBox()
+});
 
 /* helpers */
 function toast(m,undo){const t=el('div','toast',m);t.setAttribute('role','status');

@@ -18,6 +18,7 @@ SET UP
 RUN
 VS Code > Open Folder > this folder > Live Server > Go Live. Sign in as Gef or Jini.
 Browsers may block music autoplay until you press Play once.
+Drag the shared music player's top handle to move it; drag its bottom-right corner to resize it. Its position and size are saved in that browser.
 
 PUT IT ONLINE SO YOU BOTH CAN USE IT
 Upload this folder to a PRIVATE GitHub repository, add your partner as a collaborator,
